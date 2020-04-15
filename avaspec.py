@@ -4,8 +4,10 @@ import ctypes.wintypes
 import struct
 import globals
 from PyQt5.QtCore import *
+from enum import Enum
 
 AVS_SERIAL_LEN = 10
+VERSION_LEN = 16
 USER_ID_LEN = 64
 WM_MEAS_READY = 0x8001
 
@@ -104,40 +106,162 @@ class DeviceConfigType(ctypes.Structure):
               ("m_Reserved", ctypes.c_uint8 * 9720),
               ("m_OemData", ctypes.c_uint8 * 4096)]
 
-def AVS_Init(x):
+class DeviceStatus(Enum):
+    UNKNOWN = 0
+    USB_AVAILABLE = 1
+    USB_IN_USE_BY_APPLICATION = 2
+    USB_IN_USE_BY_OTHER = 3
+    ETH_AVAILABLE = 4
+    ETH_IN_USE_BY_APPLICATION = 5
+    ETH_IN_USE_BY_OTHER = 6
+    ETH_ALREADY_IN_USE_USB = 7
+
+def AVS_Init(a_Port = 0):
+    """
+    Initializes the communication interface with the spectrometers.
+    
+    :param a_Port: ID of port to be used, defined as follows; -1: Use both
+    Ethernet(AS7010) and USB ports; 0: Use USB port; 256: Use Ethernet(AS7010)
+    
+    :return: Number of connected and/or found devices; ERR_CONNECTION_FAILURE,
+    ERR_ETHCONN_REUSE
+    """
+    
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int)
     paramflags = (1, "port",),
     AVS_Init = prototype(("AVS_Init", lib), paramflags)
-    ret = AVS_Init(x) 
+    ret = AVS_Init(a_Port) 
     return ret 
 
+def AVS_Done():
+    """
+    Closes the communication and releases internal storage.
+    
+    :return: SUCCESS
+    """
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
+    AVS_Done = prototype(("AVS_Done",lib),)
+    ret = AVS_Done()
+    return ret
+
 def AVS_GetNrOfDevices():
+    """
+    Depricated function, replaced by AVS_UpdateUSBDevices(). The functionality
+    is identical.
+    
+    :return: Number of devices found.
+    """
+    
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
     AVS_GetNrOfDevices = prototype(("AVS_GetNrOfDevices", lib),)
     ret = AVS_GetNrOfDevices()
     return ret
 
-def AVS_GetList(listsize, requiredsize, IDlist):
+def AVS_UpdateUSBDevices():
+    """
+    Internally checks the list of connected USB devices and returns the number 
+    of devices attached. If AVS_Init() was called with a_Port=-1, the return 
+    value also includes the number of ETH devices.
+    
+    :return: Number of devices found.    
+    """
+    
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
+
+    AVS_UpdateUSBDevices = prototype(("AVS_UpdateUSBDevices", lib),)
+    ret = AVS_UpdateUSBDevices()
+
+    return ret
+
+def AVS_UpdateETHDevices(listsize = 75):
+    """
+    Internally checks the list of connected ETH devices and returns the number 
+    of devices attached. If AVS_Init() was called with a_Port=-1, the return 
+    value also includes the number of USB devices.
+    
+    :param listsize: Required size for list of returned devices. Default value 
+    is 75, the size of AvsIdentityType
+    :return: Tuple containing the required list size (position 0) and 
+    AvsIdentityType for each found device.
+    """
+    
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
     paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
     AVS_GetList = prototype(("AVS_GetList", lib), paramflags)
     ret = AVS_GetList(listsize)
-    # looks like you only pass the '1' parameters here
-    # the '2' parameters are returned in 'ret' !!!
+
     return ret
 
-def AVS_Activate(deviceID):
+def AVS_GetList(listsize = 75):
+    """
+    Returns device information for each spectrometer connected to the ports
+    indicated at AVS_Init(). Wrapper function has been modified to 
+    automatically update to correct listsize.
+    
+    :param listsize: Size allocated for buffer for list of returned devices. 
+    Default value is 75, the size of AvsIdentityType
+    :return: Tuple containing AvsIdentityType for each found device. Devices 
+    are sorted by UserFriendlyName
+    """
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
+    paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
+    AVS_GetList = prototype(("AVS_GetList", lib), paramflags)
+    ret = AVS_GetList(listsize)
+    if ret[0] != listsize:
+        ret = AVS_GetList(ret[0])
+    
+    return ret[1:]
+
+def AVS_GetHandleFromSerial(deviceSerial):
+    """
+    Retrieves the AvsHandle for the spectrometer with serialnumber deviceSerial. 
+    Recommend usng AVS_Activate.
+    
+    :param deviceSerial: The serialnumber of the spectrometer
+    :type deviceSerial: str, bytes
+    :return: AvsHandle, handle to be used in subsequent function calls
+    """
+    
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_char_p)
+    paramflags = (1, "deviceSerial",),
+    AVS_Activate = prototype(("AVS_Activate", lib), paramflags)
+    if type(deviceSerial) is str:
+        deviceSerial = deviceSerial.encode("utf-8")
+    ret = AVS_Activate(deviceSerial)
+    return ret
+    
+
+def AVS_Activate(deviceId):
+    """
+    Activates spectrometer for communication
+    
+    :param deviceId: The device identifier
+    :type deviceId: AvsIdentityType
+    :return: AvsHandle, handle to be used in subsequent function calls
+    """
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.POINTER(AvsIdentityType))
     paramflags = (1, "deviceId",),
     AVS_Activate = prototype(("AVS_Activate", lib), paramflags)
-    ret = AVS_Activate(deviceID)
+    ret = AVS_Activate(deviceId)
     return ret
 
 def AVS_UseHighResAdc(handle, enable):
+    """
+    Sets the ADC range of the spectrometer readout.
+    
+    :param handle: AvsHandle of the spectrometer
+    :param enable: Boolean, True enables 16 bit resolution (65535 max value), 
+    false uses 14 bit resolution (16383.17 max value)
+    """
+    
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
     paramflags = (1, "handle",), (1, "enable",),
@@ -145,7 +269,21 @@ def AVS_UseHighResAdc(handle, enable):
     ret = AVS_UseHighResAdc(handle, enable)
     return ret
 
+def AVS_GetVersionInfo(handle, FPGAversion, FWversion, DLLversion):
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN)
+    paramflags = (1, "handle",), (2, "FPGAversion",), (2, "FWversion",), (2, "DLLversion",),
+    AVS_GetVersionInfo =prototype(("AVS_GetVersionInfo", lib), paramflags) 
+    ret = AVS_GetVersionInfo(handle)
+    return ret
+
 def AVS_PrepareMeasure(handle, measconf):
+    """
+    Prepares measurement on the spectrometer using the specificed configuration.
+    :param handle: AvsHandle returned by AVS_Activate or others
+    :param measconf: MeasConfigType containing measurement configuration.
+    """    
+    
     lib = ctypes.WinDLL("avaspecx64.dll")
     datatype = ctypes.c_byte * 41
     data = datatype()
@@ -182,6 +320,18 @@ def AVS_PrepareMeasure(handle, measconf):
     return ret
 
 def AVS_Measure(handle, windowhandle, nummeas):
+    """
+    Starts measurement on the spectrometer.
+    
+    :param handle: AvsHandle of the spectrometer
+    :param windowhandle: Window handle to notify application measurement result
+    data is available. The library sends a Windows message to the window with 
+    command WM_MEAS_READY, with SUCCESS, the number of scans that were saved in
+    RAM (if enabled), or INVALID_MEAS_DATA as WPARM value and handle as LPARM 
+    value. Use on Windows only, 0 to disable.
+    :param nummeas: number of measurements to do. -1 is infinite, -2 is used to
+    start Dynamic StoreToRam
+    """
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.wintypes.HWND, ctypes.c_uint16)
     paramflags = (1, "handle",), (1, "windowhandle",), (1, "nummeas"),
@@ -232,13 +382,72 @@ def AVS_GetScopeData(handle, timelabel, spectrum):
     ret = AVS_GetScopeData(handle)
     return ret
 
-def AVS_GetParameter(handle, size, reqsize, deviceconfig):
+def AVS_GetLambda(handle):
+    """
+    Returns the wavelength values corresponding to the pixels if available. 
+    This information is stored in the Library during the AVS_Activate() procedure.
+    
+    :param handle: the AvsHandle of the spectrometer
+    :return: 4096 element array of wavelength values for pixels. If the detector
+    is less than 4096 pixels, zeros are returned for extra pixels.
+    """
+    
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double * 4096))
+    paramflags = (1, "handle",), (2, "wavelength",),
+    AVS_GetLambda = prototype(("AVS_GetLambda", lib), paramflags)
+    ret = AVS_GetLambda(handle)
+    return ret
+
+def AVS_GetNumPixels(handle):
+    """
+    Returns the number of pixels of a spectrometer. This information is stored 
+    in the Library during the AVS_Activate() procedure.
+    
+    :param handle: the AvsHandle of the spectrometer
+    :return: unsigned integer, number of pixels in spectrometer
+    """
+    
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_short))
+    paramflags = (1, "handle",), (2, "numPixels",),
+    AVS_GetNumPixels = prototype(("AVS_GetNumPixels",lib), paramflags)
+    ret = AVS_GetNumPixels(handle)
+    return ret
+    
+def AVS_SetDigOut(handle, portId, value):
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.c_uint8)
+    paramflags = (1, "handle",), (1, "portId",), (1, "value",),
+    AVS_SetDigOut = prototype(("AVS_SetDigOut", lib), paramflags)
+    ret = AVS_SetDigOut(handle, portId, value)
+    return ret
+
+def AVS_GetAnalogIn(handle, AnalogInId, AnalogIn):
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.POINTER(ctypes.c_float))
+    paramflags = (1, "handle",), (1, "AnalogInId",), (2, "AnalogIn",),
+    AVS_GetAnalogIn = prototype(("AVS_GetAnalogIn", lib), paramflags)
+    ret = AVS_GetAnalogIn(handle, AnalogInId)
+    return ret
+
+def AVS_GetParameter(handle, size = 63484):
+    """
+    Returns the device information of the spectrometer.
+    
+    :param handle: the AvsHandle of the spectrometer
+    :param size: size in bytes allocated to store DeviceConfigType
+    :return: DeviceConfigType containing spectrometer configuration data
+    """
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(DeviceConfigType))
     paramflags = (1, "handle",), (1, "size",), (2, "reqsize",), (2, "deviceconfig",),
     AVS_GetParameter = prototype(("AVS_GetParameter", lib), paramflags)
     ret = AVS_GetParameter(handle, size)
-    return ret
+    if ret[0] != size:
+        ret = AVS_GetParameter(ret[0])
+    
+    return ret[1:]
 
 def AVS_SetParameter(handle, deviceconfig):
     lib = ctypes.WinDLL("avaspecx64.dll")
@@ -257,7 +466,7 @@ def AVS_SetParameter(handle, deviceconfig):
                        "IIIBHB" +                  # EthernetSettings
                        "9720B" +                   # Reserved
                        "4096B",                    # OemData
-                       deviceconfig.mLen,
+                       deviceconfig.m_Len,
                        deviceconfig.m_ConfigVersion,
                        deviceconfig.m_aUserFriendlyId,
                        deviceconfig.m_Detector_m_SensorType,
