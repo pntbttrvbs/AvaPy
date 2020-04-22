@@ -192,31 +192,31 @@ def AVS_UpdateETHDevices(listsize = 75):
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
     paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
-    AVS_GetList = prototype(("AVS_GetList", lib), paramflags)
-    ret = AVS_GetList(listsize)
+    AVS_UpdateETHDevices = prototype(("AVS_UpdateETHDevices", lib), paramflags)
+    ret = AVS_UpdateETHDevices(listsize)
 
     return ret
 
-def AVS_GetList(listsize = 75):
+def AVS_GetList(spectrometers = 1):
     """
     Returns device information for each spectrometer connected to the ports
     indicated at AVS_Init(). Wrapper function has been modified to 
     automatically update to correct listsize.
     
-    :param listsize: Size allocated for buffer for list of returned devices. 
-    Default value is 75, the size of AvsIdentityType
+    :param spectrometers: number of spectrometers connected. function uses 
+    default value of 1, and automatically corrects.
     :return: Tuple containing AvsIdentityType for each found device. Devices 
     are sorted by UserFriendlyName
     """
     lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType*spectrometers))
     paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
-    AVS_GetList = prototype(("AVS_GetList", lib), paramflags)
-    ret = AVS_GetList(listsize)
-    if ret[0] != listsize:
-        ret = AVS_GetList(ret[0])
+    PT_GetList = prototype(("AVS_GetList", lib), paramflags)
+    reqBufferSize, spectrometerList = PT_GetList(spectrometers*75)
+    if reqBufferSize != spectrometers*75:
+        spectrometerList = AVS_GetList(reqBufferSize//75)
     
-    return ret[1:]
+    return spectrometerList
 
 def AVS_GetHandleFromSerial(deviceSerial):
     """
@@ -374,13 +374,22 @@ def AVS_PollScan(handle):
     ret = AVS_PollScan(handle)
     return ret
     
-def AVS_GetScopeData(handle, timelabel, spectrum):
+def AVS_GetScopeData(handle):
+    """
+    Returns the pixel values of the last performed measurement. Should be 
+    called after the notification on AVS_Measure is triggered. 
+    
+    :param handle: the AvsHandle of the spectrometer
+    :return timestamp: ticks count last pixel of spectrum is received by 
+    microcontroller ticks in 10 microsecond units since spectrometer started
+    :return spectrum: 4096 element array of doubles, pixels values of spectrometer
+    """
     lib = ctypes.WinDLL("avaspecx64.dll")
     prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_double * 4096))
     paramflags = (1, "handle",), (2, "timelabel",), (2, "spectrum",),
     AVS_GetScopeData = prototype(("AVS_GetScopeData", lib), paramflags)
-    ret = AVS_GetScopeData(handle)
-    return ret
+    timestamp, spectrum = AVS_GetScopeData(handle)
+    return timestamp, spectrum
 
 def AVS_GetLambda(handle):
     """
@@ -447,7 +456,7 @@ def AVS_GetParameter(handle, size = 63484):
     if ret[0] != size:
         ret = AVS_GetParameter(ret[0])
     
-    return ret[1:]
+    return ret[1]
 
 def AVS_SetParameter(handle, deviceconfig):
     lib = ctypes.WinDLL("avaspecx64.dll")
@@ -539,4 +548,23 @@ def AVS_SetParameter(handle, deviceconfig):
     paramflags = (1, "handle",), (1, "deviceconfig",),  
     AVS_SetParameter = prototype(("AVS_SetParameter", lib), paramflags)
     ret = AVS_SetParameter(handle, data)
+    return ret
+
+def AVS_SetSyncMode(handle, enable):
+    """
+    Disables/Enables support for synchronous measurement. Library takes care of 
+    dividing Nmsr request into Nmsr number of single measurement requests.
+    
+    See AvaSpec Library Manual section 3.4.8 for more information on running 
+    multiple spectrometers synchronized.
+    
+    :param handle: AvsHandle of the master device spectrometer.
+    :param enable: Boolean, 0 disables sync mode, 1 enables sync mode 
+    """
+    
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
+    paramflags = (1, "handle",), (1, "enable",),
+    AVS_SetSyncMode = prototype(("AVS_SetSyncMode", lib), paramflags)
+    ret = AVS_SetSyncMode(handle, enable)
     return ret
