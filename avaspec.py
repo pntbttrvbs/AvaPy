@@ -2,7 +2,6 @@
 import ctypes
 import ctypes.wintypes
 import struct
-import globals
 from PyQt5.QtCore import *
 from enum import Enum
 
