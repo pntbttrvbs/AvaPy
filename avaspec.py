@@ -10,6 +10,13 @@ VERSION_LEN = 16
 USER_ID_LEN = 64
 WM_MEAS_READY = 0x8001
 
+if 'win' in sys.platform:
+    lib = ctypes.WinDLL("avaspecx64.dll")
+    func = ctypes.WINFUNCTYPE
+else:
+    lib = ctypes.CDLL("/usr/local/lib/libavs.so.0.2.0")
+    func = ctypes.CFUNCTYPE
+
 class AvsIdentityType(ctypes.Structure):
   _pack_ = 1
   _fields_ = [("SerialNumber", ctypes.c_char * AVS_SERIAL_LEN),
@@ -126,8 +133,8 @@ def AVS_Init(a_Port = 0):
     ERR_ETHCONN_REUSE
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int)
+
+    prototype = func(ctypes.c_int, ctypes.c_int)
     paramflags = (1, "port",),
     AVS_Init = prototype(("AVS_Init", lib), paramflags)
     ret = AVS_Init(a_Port) 
@@ -139,8 +146,8 @@ def AVS_Done():
     
     :return: SUCCESS
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
+
+    prototype = func(ctypes.c_int)
     AVS_Done = prototype(("AVS_Done",lib),)
     ret = AVS_Done()
     return ret
@@ -153,8 +160,8 @@ def AVS_GetNrOfDevices():
     :return: Number of devices found.
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
+
+    prototype = func(ctypes.c_int)
     AVS_GetNrOfDevices = prototype(("AVS_GetNrOfDevices", lib),)
     ret = AVS_GetNrOfDevices()
     return ret
@@ -168,8 +175,8 @@ def AVS_UpdateUSBDevices():
     :return: Number of devices found.    
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int)
+
+    prototype = func(ctypes.c_int)
 
     AVS_UpdateUSBDevices = prototype(("AVS_UpdateUSBDevices", lib),)
     ret = AVS_UpdateUSBDevices()
@@ -188,8 +195,8 @@ def AVS_UpdateETHDevices(listsize = 75):
     AvsIdentityType for each found device.
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType))
     paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
     AVS_UpdateETHDevices = prototype(("AVS_UpdateETHDevices", lib), paramflags)
     ret = AVS_UpdateETHDevices(listsize)
@@ -207,8 +214,8 @@ def AVS_GetList(spectrometers = 1):
     :return: Tuple containing AvsIdentityType for each found device. Devices 
     are sorted by UserFriendlyName
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType*spectrometers))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(AvsIdentityType*spectrometers))
     paramflags = (1, "listsize",), (2, "requiredsize",), (2, "IDlist",),
     PT_GetList = prototype(("AVS_GetList", lib), paramflags)
     reqBufferSize, spectrometerList = PT_GetList(spectrometers*75)
@@ -227,8 +234,8 @@ def AVS_GetHandleFromSerial(deviceSerial):
     :return: AvsHandle, handle to be used in subsequent function calls
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_char_p)
+
+    prototype = func(ctypes.c_int, ctypes.c_char_p)
     paramflags = (1, "deviceSerial",),
     AVS_Activate = prototype(("AVS_Activate", lib), paramflags)
     if type(deviceSerial) is str:
@@ -245,8 +252,8 @@ def AVS_Activate(deviceId):
     :type deviceId: AvsIdentityType
     :return: AvsHandle, handle to be used in subsequent function calls
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.POINTER(AvsIdentityType))
+
+    prototype = func(ctypes.c_int, ctypes.POINTER(AvsIdentityType))
     paramflags = (1, "deviceId",),
     AVS_Activate = prototype(("AVS_Activate", lib), paramflags)
     ret = AVS_Activate(deviceId)
@@ -261,16 +268,16 @@ def AVS_UseHighResAdc(handle, enable):
     false uses 14 bit resolution (16383.17 max value)
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
     paramflags = (1, "handle",), (1, "enable",),
     AVS_UseHighResAdc = prototype(("AVS_UseHighResAdc", lib), paramflags)
     ret = AVS_UseHighResAdc(handle, enable)
     return ret
 
 def AVS_GetVersionInfo(handle, FPGAversion, FWversion, DLLversion):
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN, ctypes.c_char * VERSION_LEN)
     paramflags = (1, "handle",), (2, "FPGAversion",), (2, "FWversion",), (2, "DLLversion",),
     AVS_GetVersionInfo =prototype(("AVS_GetVersionInfo", lib), paramflags) 
     ret = AVS_GetVersionInfo(handle)
@@ -283,7 +290,7 @@ def AVS_PrepareMeasure(handle, measconf):
     :param measconf: MeasConfigType containing measurement configuration.
     """    
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
+
     datatype = ctypes.c_byte * 41
     data = datatype()
     temp = datatype()
@@ -312,7 +319,7 @@ def AVS_PrepareMeasure(handle, measconf):
     while (x < 41): # 0 through 40
         data[x] = temp[x]
         x += 1
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_byte * 41)
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_byte * 41)
     paramflags = (1, "handle",), (1, "measconf",),  
     AVS_PrepareMeasure = prototype(("AVS_PrepareMeasure", lib), paramflags)
     ret = AVS_PrepareMeasure(handle, data)
@@ -331,8 +338,8 @@ def AVS_Measure(handle, windowhandle, nummeas):
     :param nummeas: number of measurements to do. -1 is infinite, -2 is used to
     start Dynamic StoreToRam
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.wintypes.HWND, ctypes.c_uint16)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.wintypes.HWND, ctypes.c_uint16)
     paramflags = (1, "handle",), (1, "windowhandle",), (1, "nummeas"),
     AVS_Measure = prototype(("AVS_Measure", lib), paramflags)
     ret = AVS_Measure(handle, windowhandle, nummeas) 
@@ -351,23 +358,23 @@ class callbackclass(QObject):
 
 def AVS_MeasureCallback(handle, adres, nummeas):
     CBTYPE = ctypes.CFUNCTYPE(None, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, CBTYPE, ctypes.c_uint16)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, CBTYPE, ctypes.c_uint16)
     paramflags = (1, "handle",), (1, "adres",), (1, "nummeas"),
     AVS_MeasureCallback = prototype(("AVS_MeasureCallback", lib), paramflags)
     ret = AVS_MeasureCallback(handle, CBTYPE(callbackclass.callback), nummeas)  # CRASHES python
 
 def AVS_StopMeasure(handle):
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int)
+
+    prototype = func(ctypes.c_int, ctypes.c_int)
     paramflags = (1, "handle",),
     AVS_StopMeasure = prototype(("AVS_StopMeasure", lib), paramflags)
     ret = AVS_StopMeasure(handle)
     return ret
 
 def AVS_PollScan(handle):
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int)
+
+    prototype = func(ctypes.c_bool, ctypes.c_int)
     paramflags = (1, "handle",),
     AVS_PollScan = prototype(("AVS_PollScan", lib), paramflags)
     ret = AVS_PollScan(handle)
@@ -383,8 +390,8 @@ def AVS_GetScopeData(handle):
     microcontroller ticks in 10 microsecond units since spectrometer started
     :return spectrum: 4096 element array of doubles, pixels values of spectrometer
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_double * 4096))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_double * 4096))
     paramflags = (1, "handle",), (2, "timelabel",), (2, "spectrum",),
     AVS_GetScopeData = prototype(("AVS_GetScopeData", lib), paramflags)
     timestamp, spectrum = AVS_GetScopeData(handle)
@@ -400,8 +407,8 @@ def AVS_GetLambda(handle):
     is less than 4096 pixels, zeros are returned for extra pixels.
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double * 4096))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double * 4096))
     paramflags = (1, "handle",), (2, "wavelength",),
     AVS_GetLambda = prototype(("AVS_GetLambda", lib), paramflags)
     ret = AVS_GetLambda(handle)
@@ -416,24 +423,24 @@ def AVS_GetNumPixels(handle):
     :return: unsigned integer, number of pixels in spectrometer
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_short))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_short))
     paramflags = (1, "handle",), (2, "numPixels",),
     AVS_GetNumPixels = prototype(("AVS_GetNumPixels",lib), paramflags)
     ret = AVS_GetNumPixels(handle)
     return ret
     
 def AVS_SetDigOut(handle, portId, value):
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.c_uint8)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.c_uint8)
     paramflags = (1, "handle",), (1, "portId",), (1, "value",),
     AVS_SetDigOut = prototype(("AVS_SetDigOut", lib), paramflags)
     ret = AVS_SetDigOut(handle, portId, value)
     return ret
 
 def AVS_GetAnalogIn(handle, AnalogInId, AnalogIn):
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.POINTER(ctypes.c_float))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_uint8, ctypes.POINTER(ctypes.c_float))
     paramflags = (1, "handle",), (1, "AnalogInId",), (2, "AnalogIn",),
     AVS_GetAnalogIn = prototype(("AVS_GetAnalogIn", lib), paramflags)
     ret = AVS_GetAnalogIn(handle, AnalogInId)
@@ -447,8 +454,8 @@ def AVS_GetParameter(handle, size = 63484):
     :param size: size in bytes allocated to store DeviceConfigType
     :return: DeviceConfigType containing spectrometer configuration data
     """
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(DeviceConfigType))
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(DeviceConfigType))
     paramflags = (1, "handle",), (1, "size",), (2, "reqsize",), (2, "deviceconfig",),
     AVS_GetParameter = prototype(("AVS_GetParameter", lib), paramflags)
     ret = AVS_GetParameter(handle, size)
@@ -458,7 +465,7 @@ def AVS_GetParameter(handle, size = 63484):
     return ret[1]
 
 def AVS_SetParameter(handle, deviceconfig):
-    lib = ctypes.WinDLL("avaspecx64.dll")
+
     datatype = ctypes.c_byte * 63484
     data = datatype()
     temp = datatype()
@@ -543,7 +550,7 @@ def AVS_SetParameter(handle, deviceconfig):
     while (x < 63484): # 0 through 63483
         data[x] = temp[x]
         x += 1
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_byte * 63484)
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_byte * 63484)
     paramflags = (1, "handle",), (1, "deviceconfig",),  
     AVS_SetParameter = prototype(("AVS_SetParameter", lib), paramflags)
     ret = AVS_SetParameter(handle, data)
@@ -561,8 +568,8 @@ def AVS_SetSyncMode(handle, enable):
     :param enable: Boolean, 0 disables sync mode, 1 enables sync mode 
     """
     
-    lib = ctypes.WinDLL("avaspecx64.dll")
-    prototype = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
+
+    prototype = func(ctypes.c_int, ctypes.c_int, ctypes.c_bool)
     paramflags = (1, "handle",), (1, "enable",),
     AVS_SetSyncMode = prototype(("AVS_SetSyncMode", lib), paramflags)
     ret = AVS_SetSyncMode(handle, enable)
