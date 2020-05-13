@@ -1,6 +1,5 @@
 ﻿import sys
 import ctypes
-import ctypes.wintypes
 import struct
 from PyQt5.QtCore import *
 from enum import Enum
@@ -11,6 +10,7 @@ USER_ID_LEN = 64
 WM_MEAS_READY = 0x8001
 
 if 'win' in sys.platform:
+    import ctypes.wintypes
     lib = ctypes.WinDLL("avaspecx64.dll")
     func = ctypes.WINFUNCTYPE
 else:
