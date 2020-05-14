@@ -14,7 +14,7 @@ if 'win' in sys.platform:
     lib = ctypes.WinDLL("avaspecx64.dll")
     func = ctypes.WINFUNCTYPE
 else:
-    lib = ctypes.CDLL("/usr/local/lib/libavs.so.0.2.0")
+    lib = ctypes.CDLL("/usr/local/lib/libavs.so.0")
     func = ctypes.CFUNCTYPE
 
 class AvsIdentityType(ctypes.Structure):
